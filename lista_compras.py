@@ -50,7 +50,7 @@ if 'compras' not in st.session_state:
         ]},
         {"categoria": "Limpeza & Higiene", "itens": [
             {"id": 27, "nome": "Papel Higiênico (12r)", "qtd": 2, "preco": 16.90, "checked": False},
-            {"id": 28, "nome": "Detergente", "qtd": 4, "preco": 2.39, "checked": false}
+            {"id": 28, "nome": "Detergente", "qtd": 4, "preco": 2.39, "checked": False}
         ]}
     ]
 
@@ -151,3 +151,4 @@ with col_f2:
 if st.button("Limpar Tudo e Reiniciar"):
     del st.session_state.compras
     st.rerun()
+
