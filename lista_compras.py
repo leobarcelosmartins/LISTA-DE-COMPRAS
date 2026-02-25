@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 # Configuração da página
-st.set_page_config(page_title="Guanabara Mensal - Casal", page_icon="🛒", layout="centered")
+st.set_page_config(page_title="Lista de Compras Mensal", page_icon="🛒", layout="centered")
 
 # Estilo Customizado para as cores do Guanabara
 st.markdown("""
@@ -55,7 +55,7 @@ if 'compras' not in st.session_state:
     ]
 
 # Título e Header
-st.markdown('<div class="total-box"><h1>🛒 Guanabara Mensal</h1><p>Estimativa para Casal (30 dias)</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="total-box"><h1>🛒 Lista de Compra Supermercado</h1><p>(30 dias)</p></div>', unsafe_allow_html=True)
 
 # Funções de Lógica
 def add_new_item(nome, cat_idx, qtd, preco):
@@ -151,4 +151,5 @@ with col_f2:
 if st.button("Limpar Tudo e Reiniciar"):
     del st.session_state.compras
     st.rerun()
+
 
