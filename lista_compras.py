@@ -36,6 +36,12 @@ st.markdown("""
         color: #92400e;
         font-weight: bold;
     }
+    /* Estilo para simular abas */
+    .nav-button-active {
+        border-bottom: 4px solid #facc15 !important;
+        background-color: #eff6ff !important;
+        color: #1e40af !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -66,7 +72,7 @@ def get_default_data():
         ]}
     ]
 
-# Persistência de múltiplas listas no Session State
+# Persistência no Session State
 if 'listas_compras' not in st.session_state:
     st.session_state.listas_compras = {
         "Lista Mensal Padrão": get_default_data()
@@ -75,14 +81,25 @@ if 'listas_compras' not in st.session_state:
 if 'lista_ativa' not in st.session_state:
     st.session_state.lista_ativa = "Lista Mensal Padrão"
 
+if 'aba_selecionada' not in st.session_state:
+    st.session_state.aba_selecionada = "📋 Lista de Compras"
+
 # --- HEADER ---
 st.markdown('<div class="total-box"><h1>🛒 Guanabara Digital</h1><p>Gestão de Listas de Compras</p></div>', unsafe_allow_html=True)
 
-# --- NAVEGAÇÃO POR ABAS ---
-tab_lista, tab_gestao = st.tabs(["📋 Lista de Compras", "⚙️ Gerenciar Listas"])
+# --- NAVEGAÇÃO CUSTOMIZADA (Substituindo st.tabs para permitir troca programática) ---
+col_n1, col_n2 = st.columns(2)
+if col_n1.button("📋 Lista de Compras", type="primary" if st.session_state.aba_selecionada == "📋 Lista de Compras" else "secondary"):
+    st.session_state.aba_selecionada = "📋 Lista de Compras"
+    st.rerun()
+if col_n2.button("⚙️ Gerenciar Listas", type="primary" if st.session_state.aba_selecionada == "⚙️ Gerenciar Listas" else "secondary"):
+    st.session_state.aba_selecionada = "⚙️ Gerenciar Listas"
+    st.rerun()
 
-# --- ABA 1: LISTA DE COMPRAS (Visualização e Cadastro) ---
-with tab_lista:
+st.divider()
+
+# --- CONTEÚDO DA ABA: LISTA DE COMPRAS ---
+if st.session_state.aba_selecionada == "📋 Lista de Compras":
     current_list = st.session_state.listas_compras[st.session_state.lista_ativa]
     
     st.markdown(f'<div class="active-list-info">Visualizando: {st.session_state.lista_ativa}</div>', unsafe_allow_html=True)
@@ -173,8 +190,8 @@ with tab_lista:
                         categoria["itens"].pop(i)
                     st.rerun()
 
-# --- ABA 2: GERENCIAR LISTAS ---
-with tab_gestao:
+# --- CONTEÚDO DA ABA: GERENCIAR LISTAS ---
+elif st.session_state.aba_selecionada == "⚙️ Gerenciar Listas":
     st.subheader("Minhas Listas")
     
     # Criar Nova Lista
@@ -185,6 +202,7 @@ with tab_gestao:
                 # Cria a lista apenas com uma categoria inicial vazia
                 st.session_state.listas_compras[new_list_name] = [{"categoria": "Geral", "itens": []}]
                 st.session_state.lista_ativa = new_list_name
+                st.session_state.aba_selecionada = "📋 Lista de Compras" # Troca automática para a lista
                 st.success(f"Lista '{new_list_name}' criada e ativada!")
                 st.rerun()
             else:
@@ -200,6 +218,7 @@ with tab_gestao:
         
         if col_v.button("Visualizar", key=f"view_{nome_lista}"):
             st.session_state.lista_ativa = nome_lista
+            st.session_state.aba_selecionada = "📋 Lista de Compras" # Troca automática para a seção de compras
             st.rerun()
             
         if nome_lista != "Lista Mensal Padrão":
@@ -221,4 +240,3 @@ with tab_gestao:
                 lista_texto += f"{status} {item['nome']} - Qtd: {item['qtd']} - R$ {item['preco']:.2f}\n"
             lista_texto += "\n"
         st.text_area("Copie o texto:", value=lista_texto, height=200)
-        
