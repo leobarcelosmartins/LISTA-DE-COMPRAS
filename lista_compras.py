@@ -26,10 +26,20 @@ st.markdown("""
         font-weight: bold;
         border-left: 5px solid #facc15;
     }
+    .active-list-info {
+        background-color: #fffbeb;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #fef3c7;
+        margin-bottom: 15px;
+        text-align: center;
+        color: #92400e;
+        font-weight: bold;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- INICIALIZAÇÃO DE DADOS (LISTA COMPLETA 30 DIAS) ---
+# --- INICIALIZAÇÃO DE DADOS ---
 def get_default_data():
     return [
         {"categoria": "Mercearia & Despensa", "itens": [
@@ -48,43 +58,77 @@ def get_default_data():
             {"id": 13, "nome": "Ovos Brancos (30 un)", "qtd": 2, "preco": 17.50, "checked": False},
             {"id": 14, "nome": "Salsicha (kg)", "qtd": 1, "preco": 11.90, "checked": False},
         ]},
-        {"categoria": "Laticínios & Frios", "itens": [
-            {"id": 21, "nome": "Leite Integral (1L)", "qtd": 12, "preco": 4.95, "checked": False},
-            {"id": 22, "nome": "Manteiga (500g)", "qtd": 1, "preco": 22.90, "checked": False},
-            {"id": 23, "nome": "Queijo Muçarela (500g)", "qtd": 2, "preco": 24.00, "checked": False},
-            {"id": 24, "nome": "Presunto (500g)", "qtd": 2, "preco": 16.00, "checked": False},
-        ]},
         {"categoria": "Higiene & Limpeza", "itens": [
             {"id": 31, "nome": "Papel Higiênico (12r)", "qtd": 2, "preco": 16.90, "checked": False},
             {"id": 32, "nome": "Sabão em Pó (1.6kg)", "qtd": 1, "preco": 18.50, "checked": False},
             {"id": 33, "nome": "Detergente Líquido", "qtd": 5, "preco": 2.39, "checked": False},
-            {"id": 34, "nome": "Amaciante (2L)", "qtd": 1, "preco": 14.90, "checked": False},
             {"id": 35, "nome": "Sabonete (un)", "qtd": 8, "preco": 2.45, "checked": False},
-            {"id": 36, "nome": "Creme Dental", "qtd": 3, "preco": 4.50, "checked": False},
-        ]},
-        {"categoria": "Hortifruti", "itens": [
-            {"id": 41, "nome": "Batata Inglesa (kg)", "qtd": 3, "preco": 6.50, "checked": False},
-            {"id": 42, "nome": "Cebola (kg)", "qtd": 2, "preco": 5.90, "checked": False},
-            {"id": 43, "nome": "Alho (200g)", "qtd": 2, "preco": 8.50, "checked": False},
-            {"id": 44, "nome": "Tomate (kg)", "qtd": 3, "preco": 7.90, "checked": False},
         ]}
     ]
 
-if 'compras' not in st.session_state:
-    st.session_state.compras = get_default_data()
+# Persistência de múltiplas listas no Session State
+if 'listas_compras' not in st.session_state:
+    st.session_state.listas_compras = {
+        "Lista Mensal Padrão": get_default_data()
+    }
+
+if 'lista_ativa' not in st.session_state:
+    st.session_state.lista_ativa = "Lista Mensal Padrão"
 
 # --- HEADER ---
-st.markdown('<div class="total-box"><h1>🛒 Guanabara Digital</h1><p>Gestão de Compras para Casal</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="total-box"><h1>🛒 Guanabara Digital</h1><p>Gestão de Listas de Compras</p></div>', unsafe_allow_html=True)
 
 # --- NAVEGAÇÃO POR ABAS ---
-tab_lista, tab_cadastro, tab_gestao = st.tabs(["📋 Minha Lista", "➕ Cadastrar Produtos", "⚙️ Gerenciar Listas"])
+tab_lista, tab_gestao = st.tabs(["📋 Lista de Compras", "⚙️ Gerenciar Listas"])
 
-# --- ABA 1: MINHA LISTA ---
+# --- ABA 1: LISTA DE COMPRAS (Visualização e Cadastro) ---
 with tab_lista:
+    current_list = st.session_state.listas_compras[st.session_state.lista_ativa]
+    
+    st.markdown(f'<div class="active-list-info">Visualizando: {st.session_state.lista_ativa}</div>', unsafe_allow_html=True)
+
+    # Cadastro de Produtos e Categorias dentro da Lista
+    with st.expander("➕ Cadastrar Produto ou Categoria", expanded=False):
+        subtab_prod, subtab_cat = st.tabs(["Produto", "Categoria"])
+        
+        with subtab_prod:
+            with st.form("form_add_prod"):
+                nome_p = st.text_input("Nome do Produto")
+                cat_names = [c["categoria"] for c in current_list]
+                
+                if cat_names:
+                    cat_idx = st.selectbox("Categoria", range(len(cat_names)), format_func=lambda x: cat_names[x])
+                    c_col1, c_col2 = st.columns(2)
+                    qtd_p = c_col1.number_input("Qtd", min_value=1, value=1, step=1)
+                    prc_p = c_col2.number_input("Preço R$", min_value=0.0, value=0.0, step=0.01)
+                    
+                    if st.form_submit_button("Adicionar à Lista"):
+                        if nome_p:
+                            new_item = {
+                                "id": int(pd.Timestamp.now().timestamp()),
+                                "nome": nome_p,
+                                "qtd": int(qtd_p),
+                                "preco": float(prc_p),
+                                "checked": False
+                            }
+                            current_list[cat_idx]["itens"].append(new_item)
+                            st.success(f"{nome_p} adicionado!")
+                            st.rerun()
+                else:
+                    st.warning("Crie uma categoria primeiro.")
+        
+        with subtab_cat:
+            new_cat_name = st.text_input("Nome da Nova Categoria")
+            if st.button("Criar Categoria"):
+                if new_cat_name and new_cat_name not in [c["categoria"] for c in current_list]:
+                    current_list.append({"categoria": new_cat_name, "itens": []})
+                    st.success(f"Categoria {new_cat_name} criada!")
+                    st.rerun()
+
     # Cálculo de Totais
     total_geral = 0
     total_no_carrinho = 0
-    for cat in st.session_state.compras:
+    for cat in current_list:
         for item in cat["itens"]:
             sub = item["qtd"] * item["preco"]
             total_geral += sub
@@ -96,95 +140,85 @@ with tab_lista:
     
     st.progress(total_no_carrinho / total_geral if total_geral > 0 else 0)
 
-    for cat_idx, categoria in enumerate(st.session_state.compras):
-        with st.expander(f"📦 {categoria['categoria']}", expanded=True):
-            items_to_del = []
-            for item_idx, item in enumerate(categoria["itens"]):
-                c1, c2, c3, c4, c5 = st.columns([0.5, 3, 1.2, 1.5, 0.5])
+    # Listagem de Itens
+    if not current_list or (len(current_list) == 1 and not current_list[0]["itens"]):
+        st.info("Esta lista está vazia. Use o botão acima para adicionar produtos!")
+    
+    for cat_idx, categoria in enumerate(current_list):
+        if categoria["itens"] or len(current_list) > 0:
+            with st.expander(f"📦 {categoria['categoria']}", expanded=True):
+                items_to_del = []
+                for item_idx, item in enumerate(categoria["itens"]):
+                    c1, c2, c3, c4, c5 = st.columns([0.5, 3, 1.2, 1.5, 0.5])
+                    
+                    with c1:
+                        item["checked"] = st.checkbox("", value=item["checked"], key=f"chk_{st.session_state.lista_ativa}_{item['id']}")
+                    
+                    with c2:
+                        label = f"~~{item['nome']}~~" if item["checked"] else item["nome"]
+                        st.markdown(f"**{label}**")
+                    
+                    with c3:
+                        item["qtd"] = st.number_input("Qtd", min_value=0, step=1, value=int(item["qtd"]), key=f"qtd_{st.session_state.lista_ativa}_{item['id']}", label_visibility="collapsed")
+                    
+                    with c4:
+                        item["preco"] = st.number_input("R$", min_value=0.0, step=0.01, value=float(item["preco"]), key=f"prc_{st.session_state.lista_ativa}_{item['id']}", label_visibility="collapsed")
+                    
+                    with c5:
+                        if st.button("🗑️", key=f"del_{st.session_state.lista_ativa}_{item['id']}"):
+                            items_to_del.append(item_idx)
                 
-                with c1:
-                    item["checked"] = st.checkbox("", value=item["checked"], key=f"chk_{item['id']}")
-                
-                with c2:
-                    label = f"~~{item['nome']}~~" if item["checked"] else item["nome"]
-                    st.markdown(f"**{label}**")
-                
-                with c3:
-                    item["qtd"] = st.number_input("Qtd", min_value=0, step=1, value=int(item["qtd"]), key=f"qtd_{item['id']}", label_visibility="collapsed")
-                
-                with c4:
-                    item["preco"] = st.number_input("R$", min_value=0.0, step=0.01, value=float(item["preco"]), key=f"prc_{item['id']}", label_visibility="collapsed")
-                
-                with c5:
-                    if st.button("🗑️", key=f"del_{item['id']}"):
-                        items_to_del.append(item_idx)
-            
-            if items_to_del:
-                for i in sorted(items_to_del, reverse=True):
-                    categoria["itens"].pop(i)
-                st.rerun()
+                if items_to_del:
+                    for i in sorted(items_to_del, reverse=True):
+                        categoria["itens"].pop(i)
+                    st.rerun()
 
-# --- ABA 2: CADASTRAR PRODUTOS & CATEGORIAS ---
-with tab_cadastro:
-    st.subheader("Novos Itens")
-    with st.form("add_product"):
-        nome_prod = st.text_input("Nome do Produto")
-        cat_nomes = [c["categoria"] for c in st.session_state.compras]
-        cat_sel = st.selectbox("Selecione a Categoria", range(len(cat_nomes)), format_func=lambda x: cat_nomes[x])
-        c_p1, c_p2 = st.columns(2)
-        qtd_p = c_p1.number_input("Quantidade Inicial", min_value=1, step=1)
-        prc_p = c_p2.number_input("Preço Unitário R$", min_value=0.0, step=0.01)
-        
-        if st.form_submit_button("Adicionar à Lista"):
-            if nome_prod:
-                new_item = {
-                    "id": int(pd.Timestamp.now().timestamp()),
-                    "nome": nome_prod,
-                    "qtd": int(qtd_p),
-                    "preco": float(prc_p),
-                    "checked": False
-                }
-                st.session_state.compras[cat_sel]["itens"].append(new_item)
-                st.success(f"{nome_prod} adicionado!")
-                st.rerun()
-
-    st.divider()
-    st.subheader("Nova Categoria")
-    new_cat_name = st.text_input("Nome da Categoria")
-    if st.button("Criar Categoria"):
-        if new_cat_name and new_cat_name not in [c["categoria"] for c in st.session_state.compras]:
-            st.session_state.compras.append({"categoria": new_cat_name, "itens": []})
-            st.success(f"Categoria {new_cat_name} criada!")
-            st.rerun()
-
-# --- ABA 3: GERENCIAR LISTAS ---
+# --- ABA 2: GERENCIAR LISTAS ---
 with tab_gestao:
-    st.subheader("Controle de Listas")
+    st.subheader("Minhas Listas")
     
-    col_g1, col_g2 = st.columns(2)
-    
-    if col_g1.button("🔥 Criar Nova Lista do Zero"):
-        st.session_state.compras = [{"categoria": "Mercearia", "itens": []}]
-        st.warning("Todas as categorias e itens foram removidos. Comece a cadastrar!")
-        st.rerun()
-        
-    if col_g2.button("🔄 Restaurar Padrão (30 dias)"):
-        st.session_state.compras = get_default_data()
-        st.info("Lista padrão carregada com sucesso.")
-        st.rerun()
+    # Criar Nova Lista
+    with st.expander("🆕 Criar Nova Lista do Zero", expanded=False):
+        new_list_name = st.text_input("Nome da Nova Lista", placeholder="Ex: Churrasco de Domingo")
+        if st.button("Confirmar Nova Lista"):
+            if new_list_name and new_list_name not in st.session_state.listas_compras:
+                # Cria a lista apenas com uma categoria inicial vazia
+                st.session_state.listas_compras[new_list_name] = [{"categoria": "Geral", "itens": []}]
+                st.session_state.lista_ativa = new_list_name
+                st.success(f"Lista '{new_list_name}' criada e ativada!")
+                st.rerun()
+            else:
+                st.error("Nome inválido ou já existente.")
 
     st.divider()
-    st.markdown("### 📝 Instruções de Edição")
-    st.write("1. Na aba **Minha Lista**, você pode editar quantidades e preços diretamente nos campos.")
-    st.write("2. Itens marcados com 🗑️ serão removidos permanentemente.")
-    st.write("3. O progresso é salvo enquanto a aba do navegador estiver aberta.")
-    
-    if st.button("📥 Exportar para Texto (Copiar)"):
-        lista_texto = "LISTA DE COMPRAS GUANABARA\n\n"
-        for cat in st.session_state.compras:
+
+    # Tabela de Listas existentes
+    for nome_lista in list(st.session_state.listas_compras.keys()):
+        col_n, col_v, col_e = st.columns([3, 1, 1])
+        
+        col_n.markdown(f"**{nome_lista}**")
+        
+        if col_v.button("Visualizar", key=f"view_{nome_lista}"):
+            st.session_state.lista_ativa = nome_lista
+            st.rerun()
+            
+        if nome_lista != "Lista Mensal Padrão":
+            if col_e.button("Excluir", key=f"excluir_{nome_lista}"):
+                del st.session_state.listas_compras[nome_lista]
+                if st.session_state.lista_ativa == nome_lista:
+                    st.session_state.lista_ativa = "Lista Mensal Padrão"
+                st.rerun()
+        else:
+            col_e.button("Resetar", key="reset_padrao", on_click=lambda: st.session_state.listas_compras.update({"Lista Mensal Padrão": get_default_data()}))
+
+    st.divider()
+    if st.button("📥 Exportar Lista Ativa para Texto"):
+        lista_texto = f"LISTA: {st.session_state.lista_ativa}\n\n"
+        for cat in st.session_state.listas_compras[st.session_state.lista_ativa]:
             lista_texto += f"[{cat['categoria']}]\n"
             for item in cat["itens"]:
                 status = "[X]" if item["checked"] else "[ ]"
                 lista_texto += f"{status} {item['nome']} - Qtd: {item['qtd']} - R$ {item['preco']:.2f}\n"
             lista_texto += "\n"
-        st.text_area("Copie o texto abaixo:", value=lista_texto, height=300)
+        st.text_area("Copie o texto:", value=lista_texto, height=200)
+        
