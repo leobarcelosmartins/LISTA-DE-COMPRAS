@@ -1,3 +1,4 @@
+# -*- coding: utf-8 python -*-
 import streamlit as st
 import pandas as pd
 
@@ -35,12 +36,6 @@ st.markdown("""
         text-align: center;
         color: #92400e;
         font-weight: bold;
-    }
-    /* Estilo para simular abas */
-    .nav-button-active {
-        border-bottom: 4px solid #facc15 !important;
-        background-color: #eff6ff !important;
-        color: #1e40af !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -87,7 +82,7 @@ if 'aba_selecionada' not in st.session_state:
 # --- HEADER ---
 st.markdown('<div class="total-box"><h1>🛒 Guanabara Digital</h1><p>Gestão de Listas de Compras</p></div>', unsafe_allow_html=True)
 
-# --- NAVEGAÇÃO CUSTOMIZADA (Substituindo st.tabs para permitir troca programática) ---
+# --- NAVEGAÇÃO CUSTOMIZADA ---
 col_n1, col_n2 = st.columns(2)
 if col_n1.button("📋 Lista de Compras", type="primary" if st.session_state.aba_selecionada == "📋 Lista de Compras" else "secondary"):
     st.session_state.aba_selecionada = "📋 Lista de Compras"
@@ -104,7 +99,7 @@ if st.session_state.aba_selecionada == "📋 Lista de Compras":
     
     st.markdown(f'<div class="active-list-info">Visualizando: {st.session_state.lista_ativa}</div>', unsafe_allow_html=True)
 
-    # Cadastro de Produtos e Categorias dentro da Lista
+    # Cadastro de Produtos e Categorias
     with st.expander("➕ Cadastrar Produto ou Categoria", expanded=False):
         subtab_prod, subtab_cat = st.tabs(["Produto", "Categoria"])
         
@@ -142,7 +137,7 @@ if st.session_state.aba_selecionada == "📋 Lista de Compras":
                     st.success(f"Categoria {new_cat_name} criada!")
                     st.rerun()
 
-    # Cálculo de Totais
+    # Totais
     total_geral = 0
     total_no_carrinho = 0
     for cat in current_list:
@@ -157,30 +152,22 @@ if st.session_state.aba_selecionada == "📋 Lista de Compras":
     
     st.progress(total_no_carrinho / total_geral if total_geral > 0 else 0)
 
-    # Listagem de Itens
-    if not current_list or (len(current_list) == 1 and not current_list[0]["itens"]):
-        st.info("Esta lista está vazia. Use o botão acima para adicionar produtos!")
-    
+    # Listagem
     for cat_idx, categoria in enumerate(current_list):
         if categoria["itens"] or len(current_list) > 0:
             with st.expander(f"📦 {categoria['categoria']}", expanded=True):
                 items_to_del = []
                 for item_idx, item in enumerate(categoria["itens"]):
                     c1, c2, c3, c4, c5 = st.columns([0.5, 3, 1.2, 1.5, 0.5])
-                    
                     with c1:
                         item["checked"] = st.checkbox("", value=item["checked"], key=f"chk_{st.session_state.lista_ativa}_{item['id']}")
-                    
                     with c2:
                         label = f"~~{item['nome']}~~" if item["checked"] else item["nome"]
                         st.markdown(f"**{label}**")
-                    
                     with c3:
                         item["qtd"] = st.number_input("Qtd", min_value=0, step=1, value=int(item["qtd"]), key=f"qtd_{st.session_state.lista_ativa}_{item['id']}", label_visibility="collapsed")
-                    
                     with c4:
                         item["preco"] = st.number_input("R$", min_value=0.0, step=0.01, value=float(item["preco"]), key=f"prc_{st.session_state.lista_ativa}_{item['id']}", label_visibility="collapsed")
-                    
                     with c5:
                         if st.button("🗑️", key=f"del_{st.session_state.lista_ativa}_{item['id']}"):
                             items_to_del.append(item_idx)
@@ -199,28 +186,23 @@ elif st.session_state.aba_selecionada == "⚙️ Gerenciar Listas":
         new_list_name = st.text_input("Nome da Nova Lista", placeholder="Ex: Churrasco de Domingo")
         if st.button("Confirmar Nova Lista"):
             if new_list_name and new_list_name not in st.session_state.listas_compras:
-                # Cria a lista apenas com uma categoria inicial vazia
                 st.session_state.listas_compras[new_list_name] = [{"categoria": "Geral", "itens": []}]
                 st.session_state.lista_ativa = new_list_name
-                st.session_state.aba_selecionada = "📋 Lista de Compras" # Troca automática para a lista
-                st.success(f"Lista '{new_list_name}' criada e ativada!")
+                st.session_state.aba_selecionada = "📋 Lista de Compras"
                 st.rerun()
             else:
                 st.error("Nome inválido ou já existente.")
 
     st.divider()
 
-    # Tabela de Listas existentes
+    # Tabela de Listas
     for nome_lista in list(st.session_state.listas_compras.keys()):
         col_n, col_v, col_e = st.columns([3, 1, 1])
-        
         col_n.markdown(f"**{nome_lista}**")
-        
         if col_v.button("Visualizar", key=f"view_{nome_lista}"):
             st.session_state.lista_ativa = nome_lista
-            st.session_state.aba_selecionada = "📋 Lista de Compras" # Troca automática para a seção de compras
+            st.session_state.aba_selecionada = "📋 Lista de Compras"
             st.rerun()
-            
         if nome_lista != "Lista Mensal Padrão":
             if col_e.button("Excluir", key=f"excluir_{nome_lista}"):
                 del st.session_state.listas_compras[nome_lista]
@@ -231,12 +213,26 @@ elif st.session_state.aba_selecionada == "⚙️ Gerenciar Listas":
             col_e.button("Resetar", key="reset_padrao", on_click=lambda: st.session_state.listas_compras.update({"Lista Mensal Padrão": get_default_data()}))
 
     st.divider()
-    if st.button("📥 Exportar Lista Ativa para Texto"):
-        lista_texto = f"LISTA: {st.session_state.lista_ativa}\n\n"
+    
+    # EXPORTAÇÃO PARA WHATSAPP
+    if st.button("📥 Exportar Lista Ativa para WhatsApp"):
+        total_export = 0
+        lista_texto = f"*🛒 LISTA: {st.session_state.lista_ativa.upper()}*\n"
+        lista_texto += "--------------------------------\n\n"
+        
         for cat in st.session_state.listas_compras[st.session_state.lista_ativa]:
-            lista_texto += f"[{cat['categoria']}]\n"
+            if not cat["itens"]: continue
+            
+            lista_texto += f"*[{cat['categoria'].upper()}]*\n"
             for item in cat["itens"]:
-                status = "[X]" if item["checked"] else "[ ]"
-                lista_texto += f"{status} {item['nome']} - Qtd: {item['qtd']} - R$ {item['preco']:.2f}\n"
-            lista_texto += "\n"
-        st.text_area("Copie o texto:", value=lista_texto, height=200)
+                subtotal = item['qtd'] * item['preco']
+                total_export += subtotal
+                # Formatação solicitada: qtd - *descrição* - _preço_
+                lista_texto += f"{item['qtd']} - *{item['nome']}* - _R$ {item['preco']:.2f}_\n"
+            
+            lista_texto += "--------------------------------\n"
+        
+        lista_texto += f"\n*💰 TOTAL GERAL: R$ {total_export:.2f}*"
+        
+        st.info("Texto formatado para WhatsApp abaixo. Copie e cole na conversa!")
+        st.text_area("Texto para Copiar:", value=lista_texto, height=350)
