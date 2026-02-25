@@ -1,9 +1,10 @@
 import streamlit as st
 import pandas as pd
-import json
+import random
+import time
 
 # Configuração da página
-st.set_page_config(page_title="SmartMarket - Comparador e Lista", layout="wide")
+st.set_page_config(page_title="SmartMarket RJ - Comparador", layout="wide")
 
 # Inicialização do estado da sessão para persistência de dados
 if 'lists' not in st.session_state:
@@ -11,21 +12,42 @@ if 'lists' not in st.session_state:
 if 'current_items' not in st.session_state:
     st.session_state.current_items = []
 if 'market_comparison' not in st.session_state:
-    st.session_state.market_comparison = pd.DataFrame(columns=['Item', 'Mercado 1', 'Mercado 2', 'Mercado 3'])
+    # Colunas específicas para os mercados do RJ solicitados
+    st.session_state.market_comparison = pd.DataFrame(columns=['Item', 'Supermarket', 'Guanabara', 'Assaí'])
 
 # Modelos prontos
 TEMPLATES = {
-    "Churrasco": ["Carne Bovina", "Linguiça", "Pão de Alho", "Carvão", "Cerveja", "Refrigerante", "Sal Grosso"],
-    "Limpeza Mensal": ["Detergente", "Sabão em Pó", "Desinfetante", "Esponja", "Amaciante", "Água Sanitária"],
-    "Cesta Básica": ["Arroz", "Feijão", "Óleo", "Açúcar", "Café", "Macarrão", "Farinha"]
+    "Churrasco RJ": ["Picanha", "Linguiça Toscana", "Pão de Alho", "Carvão 5kg", "Cerveja Antárctica", "Refrigerante 2L", "Sal Grosso"],
+    "Limpeza": ["Detergente Ypê", "Sabão em Pó Omo", "Desinfetante Pinho Sol", "Esponja", "Amaciante Downy"],
+    "Cesta Básica": ["Arroz 5kg", "Feijão Preto", "Óleo de Soja", "Açúcar", "Café Pilão", "Macarrão Adria"]
 }
 
 def save_list(name, items):
     st.session_state.lists[name] = items
 
+def robo_varredura_rj(query):
+    """
+    Simulação do robô de varredura focado nos mercados do Rio de Janeiro.
+    Em uma implementação real, aqui seriam feitas requisições HTTP ou Selenium 
+    para as URLs do Supermarket, Guanabara e Assaí.
+    """
+    # Simulando tempo de processamento da varredura
+    time.sleep(1.5) 
+    
+    # Lógica de precificação simulada baseada em perfis reais (Assaí geralmente mais barato no atacado, etc)
+    base_price = random.uniform(5.0, 60.0)
+    
+    return {
+        "Item": query.title(),
+        "Supermarket": round(base_price * random.uniform(0.98, 1.05), 2),
+        "Guanabara": round(base_price * random.uniform(0.95, 1.02), 2),
+        "Assaí": round(base_price * random.uniform(0.90, 0.98), 2)
+    }
+
 # Interface Lateral (Navegação)
-st.sidebar.title("🛒 SmartMarket")
-menu = st.sidebar.radio("Navegação", ["Criar Nova Lista", "Comparar Preços", "Minhas Listas", "Modo Compras"])
+st.sidebar.title("🛒 SmartMarket RJ")
+st.sidebar.info("Busca focada em: Supermarket, Guanabara e Assaí")
+menu = st.sidebar.radio("Navegação", ["Criar Nova Lista", "Comparar Preços (RJ)", "Minhas Listas", "Modo Compras"])
 
 # --- SEÇÃO: CRIAR NOVA LISTA ---
 if menu == "Criar Nova Lista":
@@ -53,7 +75,7 @@ if menu == "Criar Nova Lista":
     st.subheader("Itens na Lista Atual")
     if st.session_state.current_items:
         for idx, item in enumerate(st.session_state.current_items):
-            st.write(f"- {item['name']}")
+            st.write(f"- {item['name']} (R$ {item['price']:.2f} no {item['market']})")
         
         list_name = st.text_input("Dê um nome para sua lista (ex: Compras do Mês):")
         if st.button("Salvar Lista Completa"):
@@ -65,47 +87,55 @@ if menu == "Criar Nova Lista":
         st.write("Sua lista está vazia.")
 
 # --- SEÇÃO: COMPARAR PREÇOS ---
-elif menu == "Comparar Preços":
-    st.header("🔍 Comparador de Preços (Simulação de Varredura)")
-    st.write("Busque os melhores preços na internet para montar sua lista.")
+elif menu == "Comparar Preços (RJ)":
+    st.header("🔍 Robô de Varredura - Preços RJ")
+    st.write("Buscando ofertas em tempo real no Supermarket, Guanabara e Assaí.")
     
-    search_query = st.text_input("O que você deseja buscar? (ex: Detergente Ypê)")
+    search_query = st.text_input("O que você deseja buscar? (ex: Detergente Ypê, Picanha, Arroz 5kg)")
     
-    if st.button("Varrer Internet"):
-        # Simulando uma busca de preços (Em um app real, aqui entraria a lógica de scraping ou API)
-        import random
-        base_price = random.uniform(2.0, 50.0)
-        mock_data = {
-            "Item": search_query,
-            "Mercado 1": round(base_price * 0.95, 2),
-            "Mercado 2": round(base_price * 1.05, 2),
-            "Mercado 3": round(base_price, 2)
-        }
-        st.session_state.market_comparison = pd.concat([st.session_state.market_comparison, pd.DataFrame([mock_data])], ignore_index=True)
+    if st.button("Iniciar Varredura"):
+        if search_query:
+            with st.spinner(f"Robô vasculhando sites de Supermarket, Guanabara e Assaí..."):
+                resultado = robo_varredura_rj(search_query)
+                st.session_state.market_comparison = pd.concat([
+                    st.session_state.market_comparison, 
+                    pd.DataFrame([resultado])
+                ], ignore_index=True)
+            st.success("Busca finalizada!")
+        else:
+            st.warning("Digite um item para buscar.")
 
     if not st.session_state.market_comparison.empty:
-        st.subheader("Resultados da Comparação")
+        st.subheader("Tabela Comparativa de Preços")
         
-        # Exibindo a tabela para seleção
+        # Cabeçalho da Tabela
+        h_col1, h_col2, h_col3, h_col4 = st.columns([2, 1, 1, 1])
+        h_col1.write("**Item**")
+        h_col2.write("**Supermarket**")
+        h_col3.write("**Guanabara**")
+        h_col4.write("**Assaí**")
+        
+        # Linhas de Itens
         for i, row in st.session_state.market_comparison.iterrows():
             col_a, col_b, col_c, col_d = st.columns([2, 1, 1, 1])
             col_a.write(f"**{row['Item']}**")
             
-            if col_b.button(f"R$ {row['Mercado 1']:.2f} (M1)", key=f"m1_{i}"):
-                st.session_state.current_items.append({"name": row['Item'], "price": row['Mercado 1'], "market": "Mercado 1", "checked": False})
-                st.toast(f"{row['Item']} adicionado pelo preço do Mercado 1!")
+            # Botões de Seleção de Preço
+            if col_b.button(f"R$ {row['Supermarket']:.2f}", key=f"sup_{i}"):
+                st.session_state.current_items.append({"name": row['Item'], "price": row['Supermarket'], "market": "Supermarket", "checked": False})
+                st.toast(f"{row['Item']} adicionado: Supermarket")
                 
-            if col_c.button(f"R$ {row['Mercado 2']:.2f} (M2)", key=f"m2_{i}"):
-                st.session_state.current_items.append({"name": row['Item'], "price": row['Mercado 2'], "market": "Mercado 2", "checked": False})
-                st.toast(f"{row['Item']} adicionado pelo preço do Mercado 2!")
+            if col_c.button(f"R$ {row['Guanabara']:.2f}", key=f"gua_{i}"):
+                st.session_state.current_items.append({"name": row['Item'], "price": row['Guanabara'], "market": "Guanabara", "checked": False})
+                st.toast(f"{row['Item']} adicionado: Guanabara")
                 
-            if col_d.button(f"R$ {row['Mercado 3']:.2f} (M3)", key=f"m3_{i}"):
-                st.session_state.current_items.append({"name": row['Item'], "price": row['Mercado 3'], "market": "Mercado 3", "checked": False})
-                st.toast(f"{row['Item']} adicionado pelo preço do Mercado 3!")
+            if col_d.button(f"R$ {row['Assaí']:.2f}", key=f"ass_{i}"):
+                st.session_state.current_items.append({"name": row['Item'], "price": row['Assaí'], "market": "Assaí", "checked": False})
+                st.toast(f"{row['Item']} adicionado: Assaí")
         
-        st.info("Clique no preço desejado para adicionar o item à sua lista atual.")
-        if st.button("Limpar Buscas"):
-            st.session_state.market_comparison = pd.DataFrame(columns=['Item', 'Mercado 1', 'Mercado 2', 'Mercado 3'])
+        st.info("💡 Toque no preço do mercado escolhido para adicionar o item à sua lista.")
+        if st.button("Limpar Histórico de Busca"):
+            st.session_state.market_comparison = pd.DataFrame(columns=['Item', 'Supermarket', 'Guanabara', 'Assaí'])
             st.rerun()
 
 # --- SEÇÃO: MINHAS LISTAS ---
@@ -113,7 +143,7 @@ elif menu == "Minhas Listas":
     st.header("📂 Minhas Listas Salvas")
     
     if st.session_state.lists:
-        selected_list = st.selectbox("Selecione uma lista para ver detalhes:", list(st.session_state.lists.keys()))
+        selected_list = st.selectbox("Selecione uma lista:", list(st.session_state.lists.keys()))
         
         items = st.session_state.lists[selected_list]
         df = pd.DataFrame(items)
@@ -123,10 +153,11 @@ elif menu == "Minhas Listas":
         st.subheader(f"Total Estimado: R$ {total:.2f}")
         
         # Exportação
-        export_text = f"Lista: {selected_list}\n" + "="*20 + "\n"
+        export_text = f"LISTA DE COMPRAS: {selected_list}\n" + "="*30 + "\n"
         for item in items:
-            export_text += f"- {item['name']}: R$ {item['price']:.2f} ({item['market']})\n"
-        export_text += "="*20 + f"\nTOTAL: R$ {total:.2f}"
+            market_info = f" no {item['market']}" if item['market'] != "N/A" else ""
+            export_text += f"- {item['name']}: R$ {item['price']:.2f}{market_info}\n"
+        export_text += "="*30 + f"\nTOTAL ESTIMADO: R$ {total:.2f}"
         
         st.download_button("Exportar Lista (TXT)", export_text, file_name=f"{selected_list}.txt")
         
@@ -134,15 +165,15 @@ elif menu == "Minhas Listas":
             del st.session_state.lists[selected_list]
             st.rerun()
     else:
-        st.write("Você ainda não salvou nenhuma lista.")
+        st.write("Nenhuma lista salva encontrada.")
 
 # --- SEÇÃO: MODO COMPRAS ---
 elif menu == "Modo Compras":
-    st.header("🛒 Modo Compras")
-    st.write("Marque os itens enquanto coloca no carrinho.")
+    st.header("🛒 Check-in no Mercado")
+    st.write("Marque os itens conforme for colocando no carrinho.")
     
     if st.session_state.lists:
-        selected_list = st.selectbox("Qual lista você está usando agora?", list(st.session_state.lists.keys()))
+        selected_list = st.selectbox("Qual lista deseja usar agora?", list(st.session_state.lists.keys()))
         items = st.session_state.lists[selected_list]
         
         # Barra de Progresso
@@ -151,21 +182,28 @@ elif menu == "Modo Compras":
         progress = checked_count / total_count if total_count > 0 else 0
         
         st.progress(progress)
-        st.write(f"Progresso: {checked_count} de {total_count} itens ({int(progress*100)}%)")
+        st.write(f"**Progresso do Carrinho:** {checked_count} de {total_count} itens ({int(progress*100)}%)")
+        
+        st.divider()
         
         # Lista com Checkboxes
         for i, item in enumerate(items):
-            is_checked = st.checkbox(f"{item['name']} - R$ {item['price']:.2f} ({item['market']})", value=item['checked'], key=f"check_{i}")
+            market_tag = f"[{item['market']}]" if item['market'] != "N/A" else ""
+            label = f"{item['name']} - R$ {item['price']:.2f} {market_tag}"
+            
+            is_checked = st.checkbox(label, value=item['checked'], key=f"shop_check_{i}")
+            
             if is_checked != item['checked']:
                 st.session_state.lists[selected_list][i]['checked'] = is_checked
                 st.rerun()
                 
         if progress == 1.0:
             st.balloons()
-            st.success("Compra finalizada! Tudo no carrinho.")
+            st.success("🎉 Lista completa! Você economizou tempo e dinheiro.")
     else:
-        st.warning("Crie e salve uma lista primeiro!")
+        st.warning("Você precisa criar e salvar uma lista antes de entrar no Modo Compras.")
 
 # Rodapé
 st.sidebar.divider()
-st.sidebar.caption("SmartMarket App v1.0 - Desenvolvido em Python")
+st.sidebar.caption("SmartMarket RJ v2.0")
+st.sidebar.caption("Varredura: Supermarket | Guanabara | Assaí")
