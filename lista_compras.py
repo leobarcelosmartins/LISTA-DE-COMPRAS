@@ -1,220 +1,171 @@
-# -*- coding: utf-8 python -*-
 import streamlit as st
 import pandas as pd
+import json
 
 # Configuração da página
-st.set_page_config(page_title="Guanabara Mensal - Casal", page_icon="🛒", layout="centered")
+st.set_page_config(page_title="SmartMarket - Comparador e Lista", layout="wide")
 
-# Estilo Customizado para replicar o layout da imagem
-st.markdown("""
-    <style>
-    .main { background-color: #ffffff; }
+# Inicialização do estado da sessão para persistência de dados
+if 'lists' not in st.session_state:
+    st.session_state.lists = {}
+if 'current_items' not in st.session_state:
+    st.session_state.current_items = []
+if 'market_comparison' not in st.session_state:
+    st.session_state.market_comparison = pd.DataFrame(columns=['Item', 'Mercado 1', 'Mercado 2', 'Mercado 3'])
+
+# Modelos prontos
+TEMPLATES = {
+    "Churrasco": ["Carne Bovina", "Linguiça", "Pão de Alho", "Carvão", "Cerveja", "Refrigerante", "Sal Grosso"],
+    "Limpeza Mensal": ["Detergente", "Sabão em Pó", "Desinfetante", "Esponja", "Amaciante", "Água Sanitária"],
+    "Cesta Básica": ["Arroz", "Feijão", "Óleo", "Açúcar", "Café", "Macarrão", "Farinha"]
+}
+
+def save_list(name, items):
+    st.session_state.lists[name] = items
+
+# Interface Lateral (Navegação)
+st.sidebar.title("🛒 SmartMarket")
+menu = st.sidebar.radio("Navegação", ["Criar Nova Lista", "Comparar Preços", "Minhas Listas", "Modo Compras"])
+
+# --- SEÇÃO: CRIAR NOVA LISTA ---
+if menu == "Criar Nova Lista":
+    st.header("📝 Criar Lista de Compras")
     
-    /* Banner de visualização */
-    .active-list-info {
-        background-color: #fffbeb;
-        padding: 12px;
-        border-radius: 8px;
-        border: 1px solid #fef3c7;
-        margin-bottom: 20px;
-        text-align: center;
-        color: #92400e;
-        font-weight: bold;
-        font-size: 1.1rem;
-    }
+    col1, col2 = st.columns(2)
     
-    /* Ajuste de métricas */
-    [data-testid="stMetricValue"] {
-        font-size: 1.8rem !important;
-    }
-    
-    /* Remover padding excessivo das colunas para mobile */
-    [data-testid="column"] {
-        padding: 0 5px !important;
-    }
+    with col1:
+        st.subheader("Do Zero")
+        new_item = st.text_input("Adicionar item manualmente:")
+        if st.button("Adicionar à Lista"):
+            if new_item:
+                st.session_state.current_items.append({"name": new_item, "price": 0.0, "market": "N/A", "checked": False})
+                st.success(f"{new_item} adicionado!")
 
-    /* Estilização dos inputs para ficarem mais compactos como na imagem */
-    .stNumberInput div div input {
-        padding: 5px !important;
-        text-align: center !important;
-    }
+    with col2:
+        st.subheader("A partir de Modelos")
+        template_choice = st.selectbox("Escolha um modelo:", list(TEMPLATES.keys()))
+        if st.button("Carregar Modelo"):
+            items_to_add = [{"name": item, "price": 0.0, "market": "N/A", "checked": False} for item in TEMPLATES[template_choice]]
+            st.session_state.current_items.extend(items_to_add)
+            st.info(f"Modelo {template_choice} carregado!")
 
-    /* Botão de lixeira vermelho ao passar o mouse */
-    .stButton>button:hover {
-        border-color: #ef4444 !important;
-        color: #ef4444 !important;
-    }
-    
-    /* Linha divisória sutil */
-    hr {
-        margin: 1rem 0 !important;
-    }
-
-    /* Títulos de categoria com ícones */
-    .category-header {
-        font-weight: bold;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- INICIALIZAÇÃO DE DADOS ---
-def get_default_data():
-    return [
-        {"categoria": "Mercearia & Despensa", "itens": [
-            {"id": 1, "nome": "Arroz Branco (5kg)", "qtd": 2, "preco": 18.95, "checked": False},
-            {"id": 2, "nome": "Feijão Preto (1kg)", "qtd": 4, "preco": 7.50, "checked": False},
-            {"id": 3, "nome": "Açúcar Refinado (1kg)", "qtd": 3, "preco": 3.99, "checked": False},
-            {"id": 4, "nome": "Café Torrado (500g)", "qtd": 3, "preco": 16.90, "checked": False},
-            {"id": 5, "nome": "Óleo de Soja (900ml)", "qtd": 4, "preco": 6.99, "checked": False},
-            {"id": 6, "nome": "Macarrão Espaguete", "qtd": 5, "preco": 3.49, "checked": False},
-        ]},
-        {"categoria": "Açougue & Proteínas", "itens": [
-            {"id": 11, "nome": "Frango (Peito kg)", "qtd": 5, "preco": 19.90, "checked": False},
-            {"id": 12, "nome": "Carne Moída (kg)", "qtd": 3, "preco": 34.90, "checked": False},
-        ]}
-    ]
-
-if 'listas_compras' not in st.session_state:
-    st.session_state.listas_compras = {
-        "Lista Mensal Padrão": get_default_data()
-    }
-
-if 'lista_ativa' not in st.session_state:
-    st.session_state.lista_ativa = "Lista Mensal Padrão"
-
-if 'aba_selecionada' not in st.session_state:
-    st.session_state.aba_selecionada = "📋 Lista de Compras"
-
-# --- NAVEGAÇÃO SUPERIOR ---
-col_nav1, col_nav2 = st.columns(2)
-with col_nav1:
-    if st.button("📋 Lista de Compras", type="primary" if st.session_state.aba_selecionada == "📋 Lista de Compras" else "secondary"):
-        st.session_state.aba_selecionada = "📋 Lista de Compras"
-        st.rerun()
-with col_nav2:
-    if st.button("⚙️ Gerenciar Listas", type="primary" if st.session_state.aba_selecionada == "⚙️ Gerenciar Listas" else "secondary"):
-        st.session_state.aba_selecionada = "⚙️ Gerenciar Listas"
-        st.rerun()
-
-st.divider()
-
-# --- ABA: LISTA DE COMPRAS ---
-if st.session_state.aba_selecionada == "📋 Lista de Compras":
-    current_list = st.session_state.listas_compras[st.session_state.lista_ativa]
-    
-    # Banner de status da lista ativa
-    st.markdown(f'<div class="active-list-info">Visualizando: {st.session_state.lista_ativa}</div>', unsafe_allow_html=True)
-
-    # Cadastro Expansível
-    with st.expander("➕ Cadastrar Produto ou Categoria", expanded=False):
-        c_prod, c_cat = st.tabs(["Produto", "Categoria"])
-        with c_prod:
-            with st.form("add_p"):
-                n = st.text_input("Nome")
-                cat_opt = [c["categoria"] for c in current_list]
-                sel_c = st.selectbox("Categoria", range(len(cat_opt)), format_func=lambda x: cat_opt[x])
-                col_p1, col_p2 = st.columns(2)
-                q = col_p1.number_input("Qtd", min_value=1, value=1)
-                p = col_p2.number_input("Preço R$", min_value=0.0, value=0.0, step=0.01)
-                if st.form_submit_button("Adicionar"):
-                    current_list[sel_c]["itens"].append({"id": int(pd.Timestamp.now().timestamp()), "nome": n, "qtd": int(q), "preco": float(p), "checked": False})
-                    st.rerun()
-        with c_cat:
-            new_c = st.text_input("Nova Categoria")
-            if st.button("Criar"):
-                current_list.append({"categoria": new_c, "itens": []})
-                st.rerun()
-
-    # Totais (Exatamente como na imagem)
-    total_geral = 0
-    total_carrinho = 0
-    for cat in current_list:
-        for item in cat["itens"]:
-            total_geral += item["qtd"] * item["preco"]
-            if item["checked"]: total_carrinho += item["qtd"] * item["preco"]
-
-    col_met1, col_met2 = st.columns(2)
-    col_met1.metric("Total Estimado", f"R$ {total_geral:.2f}")
-    col_met2.metric("No Carrinho", f"R$ {total_carrinho:.2f}", delta=f"R$ {total_geral - total_carrinho:.2f}", delta_color="inverse")
-    
     st.divider()
+    st.subheader("Itens na Lista Atual")
+    if st.session_state.current_items:
+        for idx, item in enumerate(st.session_state.current_items):
+            st.write(f"- {item['name']}")
+        
+        list_name = st.text_input("Dê um nome para sua lista (ex: Compras do Mês):")
+        if st.button("Salvar Lista Completa"):
+            if list_name:
+                save_list(list_name, list(st.session_state.current_items))
+                st.session_state.current_items = []
+                st.success(f"Lista '{list_name}' salva com sucesso!")
+    else:
+        st.write("Sua lista está vazia.")
 
-    # Renderização da Lista (Layout de linha idêntico à imagem)
-    for cat_idx, categoria in enumerate(current_list):
-        with st.expander(f"📦 {categoria['categoria']}", expanded=True):
-            to_delete = []
-            for item_idx, item in enumerate(categoria["itens"]):
-                # Proporções otimizadas para manter horizontal em telas menores
-                c_chk, c_name, c_qtd, c_prc, c_del = st.columns([0.2, 2.5, 0.7, 1.2, 0.4])
-                
-                with c_chk:
-                    item["checked"] = st.checkbox("", value=item["checked"], key=f"c_{item['id']}")
-                
-                with c_name:
-                    text_style = "text-decoration: line-through; color: gray;" if item["checked"] else "font-weight: 500;"
-                    st.markdown(f'<p style="margin-top: 5px; {text_style}">{item["nome"]}</p>', unsafe_allow_html=True)
-                
-                with c_qtd:
-                    item["qtd"] = st.number_input("Qtd", min_value=0, step=1, value=int(item["qtd"]), key=f"q_{item['id']}", label_visibility="collapsed")
-                
-                with c_prc:
-                    # Formatação de preço como na imagem (ex: 18,95)
-                    item["preco"] = st.number_input("R$", min_value=0.0, step=0.01, value=float(item["preco"]), key=f"p_{item['id']}", label_visibility="collapsed")
-                
-                with c_del:
-                    if st.button("🗑️", key=f"d_{item['id']}"):
-                        to_delete.append(item_idx)
+# --- SEÇÃO: COMPARAR PREÇOS ---
+elif menu == "Comparar Preços":
+    st.header("🔍 Comparador de Preços (Simulação de Varredura)")
+    st.write("Busque os melhores preços na internet para montar sua lista.")
+    
+    search_query = st.text_input("O que você deseja buscar? (ex: Detergente Ypê)")
+    
+    if st.button("Varrer Internet"):
+        # Simulando uma busca de preços (Em um app real, aqui entraria a lógica de scraping ou API)
+        import random
+        base_price = random.uniform(2.0, 50.0)
+        mock_data = {
+            "Item": search_query,
+            "Mercado 1": round(base_price * 0.95, 2),
+            "Mercado 2": round(base_price * 1.05, 2),
+            "Mercado 3": round(base_price, 2)
+        }
+        st.session_state.market_comparison = pd.concat([st.session_state.market_comparison, pd.DataFrame([mock_data])], ignore_index=True)
+
+    if not st.session_state.market_comparison.empty:
+        st.subheader("Resultados da Comparação")
+        
+        # Exibindo a tabela para seleção
+        for i, row in st.session_state.market_comparison.iterrows():
+            col_a, col_b, col_c, col_d = st.columns([2, 1, 1, 1])
+            col_a.write(f"**{row['Item']}**")
             
-            if to_delete:
-                for i in sorted(to_delete, reverse=True):
-                    categoria["itens"].pop(i)
-                st.rerun()
+            if col_b.button(f"R$ {row['Mercado 1']:.2f} (M1)", key=f"m1_{i}"):
+                st.session_state.current_items.append({"name": row['Item'], "price": row['Mercado 1'], "market": "Mercado 1", "checked": False})
+                st.toast(f"{row['Item']} adicionado pelo preço do Mercado 1!")
+                
+            if col_c.button(f"R$ {row['Mercado 2']:.2f} (M2)", key=f"m2_{i}"):
+                st.session_state.current_items.append({"name": row['Item'], "price": row['Mercado 2'], "market": "Mercado 2", "checked": False})
+                st.toast(f"{row['Item']} adicionado pelo preço do Mercado 2!")
+                
+            if col_d.button(f"R$ {row['Mercado 3']:.2f} (M3)", key=f"m3_{i}"):
+                st.session_state.current_items.append({"name": row['Item'], "price": row['Mercado 3'], "market": "Mercado 3", "checked": False})
+                st.toast(f"{row['Item']} adicionado pelo preço do Mercado 3!")
+        
+        st.info("Clique no preço desejado para adicionar o item à sua lista atual.")
+        if st.button("Limpar Buscas"):
+            st.session_state.market_comparison = pd.DataFrame(columns=['Item', 'Mercado 1', 'Mercado 2', 'Mercado 3'])
+            st.rerun()
 
-# --- ABA: GERENCIAR LISTAS ---
-elif st.session_state.aba_selecionada == "⚙️ Gerenciar Listas":
-    st.subheader("Minhas Listas")
+# --- SEÇÃO: MINHAS LISTAS ---
+elif menu == "Minhas Listas":
+    st.header("📂 Minhas Listas Salvas")
     
-    with st.expander("🆕 Criar Nova Lista do Zero"):
-        new_name = st.text_input("Nome da Lista")
-        if st.button("Confirmar"):
-            st.session_state.listas_compras[new_name] = [{"categoria": "Geral", "itens": []}]
-            st.session_state.lista_ativa = new_name
-            st.session_state.aba_selecionada = "📋 Lista de Compras"
+    if st.session_state.lists:
+        selected_list = st.selectbox("Selecione uma lista para ver detalhes:", list(st.session_state.lists.keys()))
+        
+        items = st.session_state.lists[selected_list]
+        df = pd.DataFrame(items)
+        st.table(df[['name', 'price', 'market']])
+        
+        total = df['price'].sum()
+        st.subheader(f"Total Estimado: R$ {total:.2f}")
+        
+        # Exportação
+        export_text = f"Lista: {selected_list}\n" + "="*20 + "\n"
+        for item in items:
+            export_text += f"- {item['name']}: R$ {item['price']:.2f} ({item['market']})\n"
+        export_text += "="*20 + f"\nTOTAL: R$ {total:.2f}"
+        
+        st.download_button("Exportar Lista (TXT)", export_text, file_name=f"{selected_list}.txt")
+        
+        if st.button("Excluir esta lista"):
+            del st.session_state.lists[selected_list]
             st.rerun()
+    else:
+        st.write("Você ainda não salvou nenhuma lista.")
 
-    st.divider()
-    for nome in list(st.session_state.listas_compras.keys()):
-        c_n, c_v, c_e = st.columns([3, 1, 1])
-        c_n.markdown(f"**{nome}**")
-        if c_v.button("Visualizar", key=f"v_{nome}"):
-            st.session_state.lista_ativa = nome
-            st.session_state.aba_selecionada = "📋 Lista de Compras"
-            st.rerun()
-        if nome != "Lista Mensal Padrão":
-            if c_e.button("Excluir", key=f"e_{nome}"):
-                del st.session_state.listas_compras[nome]
-                if st.session_state.lista_ativa == nome: st.session_state.lista_ativa = "Lista Mensal Padrão"
+# --- SEÇÃO: MODO COMPRAS ---
+elif menu == "Modo Compras":
+    st.header("🛒 Modo Compras")
+    st.write("Marque os itens enquanto coloca no carrinho.")
+    
+    if st.session_state.lists:
+        selected_list = st.selectbox("Qual lista você está usando agora?", list(st.session_state.lists.keys()))
+        items = st.session_state.lists[selected_list]
+        
+        # Barra de Progresso
+        checked_count = sum(1 for item in items if item['checked'])
+        total_count = len(items)
+        progress = checked_count / total_count if total_count > 0 else 0
+        
+        st.progress(progress)
+        st.write(f"Progresso: {checked_count} de {total_count} itens ({int(progress*100)}%)")
+        
+        # Lista com Checkboxes
+        for i, item in enumerate(items):
+            is_checked = st.checkbox(f"{item['name']} - R$ {item['price']:.2f} ({item['market']})", value=item['checked'], key=f"check_{i}")
+            if is_checked != item['checked']:
+                st.session_state.lists[selected_list][i]['checked'] = is_checked
                 st.rerun()
-        else:
-            if c_e.button("Resetar", key="r_pad"):
-                st.session_state.listas_compras["Lista Mensal Padrão"] = get_default_data()
-                st.rerun()
+                
+        if progress == 1.0:
+            st.balloons()
+            st.success("Compra finalizada! Tudo no carrinho.")
+    else:
+        st.warning("Crie e salve uma lista primeiro!")
 
-    st.divider()
-    if st.button("📥 Exportar para WhatsApp"):
-        active = st.session_state.listas_compras[st.session_state.lista_ativa]
-        total = 0
-        txt = f"*🛒 LISTA: {st.session_state.lista_ativa.upper()}*\n"
-        txt += "--------------------------------\n\n"
-        for cat in active:
-            if not cat["itens"]: continue
-            txt += f"*[{cat['categoria'].upper()}]*\n"
-            for it in cat["itens"]:
-                total += it['qtd'] * it['preco']
-                txt += f"{it['qtd']} - *{it['nome']}* - _R$ {it['preco']:.2f}_\n"
-            txt += "--------------------------------\n"
-        txt += f"\n*💰 TOTAL GERAL: R$ {total:.2f}*"
-        st.text_area("Copie o texto:", value=txt, height=200)
+# Rodapé
+st.sidebar.divider()
+st.sidebar.caption("SmartMarket App v1.0 - Desenvolvido em Python")
